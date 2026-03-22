@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SearchTop v2 — Google VN Mobile Tracker</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --surface3: #2d333b;
+      --border: #30363d;
+      --primary: #58a6ff;
+      --primary-dark: #1f6feb;
+      --green: #3fb950;
+      --yellow: #d29922;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #f0883e;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* LAYOUT */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 300px; min-width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; transition: width 0.2s; }
+    .sidebar.collapsed { width: 0; min-width: 0; border-right: none; }
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* HEADER */
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo { font-size: 16px; font-weight: 700; color: var(--primary); }
+    .header-badges { display: flex; gap: 6px; }
+    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; font-size: 11px; color: var(--text-dim); }
+    .header-spacer { flex: 1; }
+    .icon-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 10px; color: var(--text-dim); cursor: pointer; font-size: 13px; }
+    .icon-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* SIDEBAR CONTENT */
+    .sidebar-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .sidebar-header h3 { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .sidebar-body { flex: 1; overflow-y: auto; }
+    .history-item { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+    .history-item:hover { background: var(--surface2); }
+    .history-item.active { background: var(--surface2); border-left: 2px solid var(--primary); }
+    .hi-keyword { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hi-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .hi-source { border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+    .src-serpapi { background: #1a2f4a; color: var(--primary); }
+    .src-crawl { background: #1a3a1a; color: var(--green); }
+    .src-both { background: #2a1a3a; color: var(--purple); }
+    .delete-btn { background: none; border: none; color: var(--border); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 4px; transition: all 0.15s; flex-shrink: 0; }
+    .history-item:hover .delete-btn { color: var(--text-dim); }
+    .delete-btn:hover { color: var(--red) !important; background: rgba(248,81,73,0.1); }
+    .sidebar-empty { padding: 40px 14px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+    /* SEARCH PANEL */
+    .search-panel { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 20px; flex-shrink: 0; }
+    .search-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .search-input { flex: 1; min-width: 180px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; color: var(--text); font-size: 14px; outline: none; }
+    .search-input:focus { border-color: var(--primary); }
+    select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }
+    select:focus { border-color: var(--primary); }
+    .btn { padding: 8px 16px; border-radius: var(--radius); border: 1px solid transparent; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+    .btn-primary { background: var(--primary-dark); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ghost { background: none; border-color: var(--border); color: var(--text-dim); }
+    .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-danger { background: none; border-color: var(--border); color: var(--red); }
+    .btn-danger:hover { border-color: var(--red); background: #2a1010; }
+    .search-opts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+    .source-group { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .source-opt { padding: 6px 14px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; border-right: 1px solid var(--border); }
+    .source-opt:last-child { border-right: none; }
+    .source-opt.active { background: var(--primary-dark); color: #fff; }
+    .batch-toggle { font-size: 12px; color: var(--text-dim); cursor: pointer; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); }
+    .batch-toggle:hover { border-color: var(--primary); color: var(--primary); }
+    .batch-area { margin-top: 10px; display: none; }
+    .batch-area.open { display: block; }
+    .batch-area textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; color: var(--text); font-size: 13px; resize: vertical; min-height: 80px; outline: none; font-family: inherit; }
+    .batch-area textarea:focus { border-color: var(--primary); }
+    .batch-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    /* CONTENT AREA */
+    .content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    /* LOADING */
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 0; gap: 12px; color: var(--text-dim); }
+    .spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESULTS TOOLBAR */
+    .results-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .results-title { font-size: 15px; font-weight: 600; flex: 1; }
+    .results-meta { font-size: 12px; color: var(--text-dim); }
+    .cached-tag { background: #0d2d0d; border: 1px solid #1f5c1f; color: var(--green); border-radius: 20px; padding: 2px 8px; font-size: 11px; }
+
+    /* TABS */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; gap: 0; overflow-x: auto; }
+    .tab { padding: 8px 14px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* STATS ROW */
+    .stats-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; flex: 1; min-width: 100px; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .stat-card.green .stat-val { color: var(--green); }
+    .stat-card.blue .stat-val { color: var(--primary); }
+    .stat-card.yellow .stat-val { color: var(--yellow); }
+    .stat-card.purple .stat-val { color: var(--purple); }
+
+    /* RESULT CARDS */
+    .result-list { display: flex; flex-direction: column; gap: 8px; }
+    .rcard {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 14px; border-left: 3px solid var(--border); transition: border-color 0.15s;
+      cursor: pointer;
+    }
+    .rcard:hover { border-color: var(--primary); background: var(--surface2); }
+    .rcard.ad { border-left-color: var(--yellow); }
+    .rcard.organic { border-left-color: var(--green); }
+    .rcard.crawl-only { border-left-color: var(--orange); }
+    .rcard.diff-warn { border-left-color: var(--red); }
+
+    .rcard-header { display: flex; align-items: flex-start; gap: 10px; }
+    .pos-badge { min-width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+    .ad .pos-badge { background: #2a2000; color: var(--yellow); }
+    .organic .pos-badge { background: #0d2a0d; color: var(--green); }
+    .crawl-only .pos-badge { background: #2a1800; color: var(--orange); }
+
+    .rcard-body { flex: 1; min-width: 0; }
+    .rcard-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .ad .rcard-type { color: var(--yellow); }
+    .organic .rcard-type { color: var(--green); }
+    .crawl-only .rcard-type { color: var(--orange); }
+    .rcard-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; line-height: 1.4; }
+    .rcard-url { font-size: 12px; color: var(--primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rcard-snippet { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .rcard-date { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    /* DIFF BADGE */
+    .diff-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-top: 4px; }
+    .diff-up { background: #0d2a0d; color: var(--green); }
+    .diff-down { background: #2a1010; color: var(--red); }
+    .diff-same { background: #1a2a1a; color: var(--text-dim); }
+    .diff-missing { background: #2a1800; color: var(--orange); }
+
+    /* COMPARE TABLE */
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+    .compare-table th { text-align: left; padding: 8px 10px; background: var(--surface2); color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .compare-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .compare-table tr:hover td { background: var(--surface2); }
+    .compare-table .pos-cell { font-weight: 700; text-align: center; width: 50px; }
+    .compare-table .url-cell { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .compare-table .title-cell { max-width: 260px; }
+    .pos-green { color: var(--green); }
+    .pos-yellow { color: var(--yellow); }
+    .pos-red { color: var(--red); }
+
+    /* KG CARD */
+    .kg-card { background: #0d1e3a; border: 1px solid #1f3a5a; border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+    .kg-card .kg-label { font-size: 11px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kg-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+    .kg-type { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+    .kg-desc { font-size: 13px; color: var(--text-dim); }
+
+    /* RELATED */
+    .related { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .related-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .related-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .related-tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--text); transition: all 0.15s; }
+    .related-tag:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* EMPTY / ERROR */
+    .empty { text-align: center; padding: 80px 0; color: var(--text-dim); }
+    .empty .icon { font-size: 40px; margin-bottom: 10px; }
+    .error-box { background: #2a0d0d; border: 1px solid var(--red); border-radius: var(--radius); padding: 12px 16px; color: var(--red); margin-bottom: 12px; font-size: 13px; }
+
+    /* REFRESH */
+    .refresh-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .auto-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+    .sw { position: relative; width: 32px; height: 18px; }
+    .sw input { opacity: 0; width: 0; height: 0; }
+    .sw-slider { position: absolute; inset: 0; background: var(--border); border-radius: 18px; cursor: pointer; transition: 0.2s; }
+    .sw-slider:before { content: ''; position: absolute; width: 12px; height: 12px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .sw input:checked + .sw-slider { background: var(--primary); }
+    .sw input:checked + .sw-slider:before { transform: translateX(14px); }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    @media (max-width: 700px) {
+      /* Sidebar ẩn trên mobile */
+      .sidebar { display: none; }
+
+      /* Header gọn hơn */
+      header { padding: 8px 10px; gap: 6px; }
+      .logo { font-size: 15px; }
+      .badge { padding: 2px 5px; font-size: 10px; }
+      .icon-btn { padding: 4px 8px; font-size: 12px; }
+
+      /* Search panel */
+      .search-panel { padding: 10px 12px; }
+      .search-row { flex-direction: column; gap: 6px; }
+      .search-input { width: 100%; font-size: 16px; padding: 10px 12px; }
+      #locDisplay { width: 100%; box-sizing: border-box; }
+      #numSel { width: 100%; padding: 10px 12px; font-size: 14px; }
+      .btn-primary { width: 100%; padding: 11px; font-size: 15px; font-weight: 700; }
+
+      /* Source + batch — cùng 1 hàng, cân đối */
+      .search-opts { gap: 6px; flex-wrap: nowrap; align-items: center; }
+      .search-opts > div { flex: 1; display: flex; align-items: center; min-width: 0; }
+      .search-opts > div > span { display: none; }
+      .source-group { flex: 1; }
+      .source-opt { flex: 1; text-align: center; padding: 8px 2px; font-size: 12px; }
+      .batch-toggle { flex-shrink: 0; white-space: nowrap; padding: 7px 12px; font-size: 12px; }
+
+      /* Content */
+      .content { padding: 10px 12px; }
+
+      /* Stats */
+      .stat-card { padding: 8px 10px; min-width: 80px; }
+      .stat-val { font-size: 18px; }
+      .stat-label { font-size: 10px; }
+
+      /* Cards */
+      .rcard { padding: 10px 12px; }
+      .pos-badge { min-width: 30px; height: 30px; font-size: 12px; }
+      .rcard-title { font-size: 13px; }
+      .rcard-snippet { font-size: 11px; }
+
+      /* Compare table cuộn ngang */
+      .compare-table { min-width: 560px; }
+      .results-toolbar { flex-wrap: wrap; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR: HISTORY -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h3>Lịch sử</h3>
+      <button class="btn btn-danger" style="padding:3px 8px;font-size:11px" onclick="clearAllHistory()">Xoá tất cả</button>
+    </div>
+    <div class="sidebar-body" id="historyList">
+      <div class="sidebar-empty">Chưa có lịch sử tìm kiếm</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- HEADER -->
+    <header>
+      <button class="icon-btn" onclick="toggleSidebar()" title="Lịch sử">☰</button>
+      <div class="logo">SearchTop</div>
+      <div class="header-badges">
+        <span class="badge">📱 Mobile</span>
+        <span class="badge">🇻🇳 VN</span>
+        <span class="badge">google.com</span>
+      </div>
+      <div class="header-spacer"></div>
+      <button class="icon-btn" onclick="loadHistory()" title="Làm mới lịch sử">↻</button>
+    </header>
+
+    <!-- SEARCH PANEL -->
+    <div class="search-panel">
+      <div class="search-row">
+        <input class="search-input" id="qInput" type="text" placeholder="Nhập từ khóa..." value="New88" />
+        <div id="locDisplay" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-dim);white-space:nowrap">
+          <span id="locLabel">⏳ Đang xác định...</span>
+        </div>
+        <input type="hidden" id="locationSel" value="hcm" />
+        <select id="numSel">
+          <option value="10">Top 10</option>
+          <option value="20" selected>Top 20</option>
+        </select>
+        <button class="btn btn-primary" id="searchBtn" onclick="doSearch()">Tìm kiếm</button>
+      </div>
+      <div class="search-opts">
+        <div>
+          <span style="font-size:11px;color:var(--text-dim);margin-right:6px">NGUỒN:</span>
+          <div class="source-group">
+            <button class="source-opt active" data-src="crawl" onclick="setSource('crawl',this)">Crawl</button>
+            <button class="source-opt" data-src="serpapi" onclick="setSource('serpapi',this)">SerpAPI</button>
+            <button class="source-opt" data-src="both" onclick="setSource('both',this)">Cả hai</button>
+          </div>
+        </div>
+        <button class="batch-toggle" onclick="toggleBatch()">Nhiều từ khóa</button>
+      </div>
+      <div class="batch-area" id="batchArea">
+        <textarea id="batchInput" placeholder="Nhập mỗi từ khóa một dòng (tối đa 10):&#10;New88&#10;New88 đăng nhập&#10;New88 khuyến mãi"></textarea>
+        <div class="batch-hint">Mỗi dòng = 1 từ khóa · Tối đa 10 · Dùng cùng Location + Source đã chọn</div>
+        <div style="margin-top:8px">
+          <button class="btn btn-primary" onclick="doBatch()">Tìm hàng loạt</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content" id="content">
+      <div class="empty">
+        <div class="icon">🔍</div>
+        <div>Nhập từ khóa và nhấn Tìm kiếm</div>
+        <div style="margin-top:6px;font-size:12px">Hỗ trợ SerpAPI · Crawl trực tiếp · So sánh 2 nguồn</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let currentSource = 'crawl';
+  let batchOpen = false;
+  let autoTimer = null;
+  let lastQ = '', lastLoc = 'hcm';
+  let activeHistoryId = null;
+
+  // Map tên thành phố → location key
+  function cityToKey(city) {
+    if (!city) return null;
+    const s = city.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ').trim();
+    if (s.includes('da nang') || s.includes('danang') || s.includes('quang nam')) return 'danang';
+    if (s.includes('ha noi') || s.includes('hanoi')) return 'hanoi';
+    if (s.includes('ho chi minh') || s.includes('sai gon') || s.includes('saigon') || s.includes('binh chanh') || s.includes('thu duc')) return 'hcm';
+    if (s.includes('can tho')) return 'cantho';
+    if (s.includes('hai phong')) return 'haiphong';
+    return null;
+  }
+
+  // Bảng label cho location key
+  const LOC_LABELS = {
+    vietnam: 'Cả nước 🇻🇳', hcm: 'TP. Hồ Chí Minh', hanoi: 'Hà Nội',
+    danang: 'Đà Nẵng', cantho: 'Cần Thơ', haiphong: 'Hải Phòng',
+  };
+
+  async function loadLocations() {
+    // Không cần load select nữa, chỉ detect vị trí
+    detectLocation();
+  }
+
+  async function detectLocation() {
+    const lbl = document.getElementById('locLabel');
+    lbl.textContent = '⏳ Đang lấy GPS...';
+
+    try {
+      // GPS — chính xác tuyệt đối, kể cả ở nước ngoài
+      const coords = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return reject(new Error('no geo'));
+        navigator.geolocation.getCurrentPosition(
+          p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+          err => reject(err),
+          { timeout: 12000, maximumAge: 60000, enableHighAccuracy: false }
+        );
+      });
+
+      lbl.textContent = '⏳ Đang xác định địa chỉ...';
+      const geo = await fetch(`/api/geocode?lat=${coords.lat}&lon=${coords.lon}`).then(r => r.json());
+
+      document.getElementById('locationSel').value = geo.key || geo.raw;
+      document.getElementById('locLabel').textContent = `📍 ${geo.label}`;
+      return;
+
+    } catch (e) {
+      // GPS bị từ chối → fallback về Việt Nam
+      document.getElementById('locationSel').value = 'vietnam';
+      lbl.textContent = '🇻🇳 Việt Nam';
+    }
+  }
+
+  function setLocationKey(key, displayText) {
+    document.getElementById('locationSel').value = key;
+    document.getElementById('locLabel').textContent = displayText || `📍 ${LOC_LABELS[key] || key}`;
+  }
+
+
+  function setSource(src, btn) {
+    currentSource = src;
+    document.querySelectorAll('.source-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function toggleBatch() {
+    batchOpen = !batchOpen;
+    document.getElementById('batchArea').classList.toggle('open', batchOpen);
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  }
+
+  document.getElementById('qInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  async function doSearch(q = null, loc = null, showLoad = true) {
+    q = q || document.getElementById('qInput').value.trim();
+    loc = loc || document.getElementById('locationSel').value;
+    const num = document.getElementById('numSel').value;
+    if (!q) return;
+
+    lastQ = q; lastLoc = loc;
+    document.getElementById('qInput').value = q;
+    document.getElementById('searchBtn').disabled = true;
+
+    if (showLoad) setContent(`<div class="loading"><div class="spinner"></div><div>Đang tìm "${escH(q)}"…</div><div style="font-size:12px;color:var(--text-dim)">${currentSource === 'both' ? 'SerpAPI + Crawl song song' : currentSource === 'crawl' ? 'Crawl trực tiếp Google VN Mobile' : 'SerpAPI'}</div></div>`);
+
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&location=${loc}&source=${currentSource}&num=${num}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Server error');
+      renderResults(data);
+      loadHistory();
+    } catch (e) {
+      setContent(`<div class="error-box">❌ ${escH(e.message)}</div>`);
+    } finally {
+      document.getElementById('searchBtn').disabled = false;
+    }
+  }
+
+  async function doBatch() {
+    const lines = document.getElementById('batchInput').value.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return alert('Nhập ít nhất 1 từ khóa');
+    if (lines.length > 10) return alert('Tối đa 10 từ khóa');
+
+    setContent(`<div class="loading"><div class="spinner"></div><div>Đang tìm ${lines.length} từ khóa…</div></div>`);
+
+    try {
+      const res = await fetch('/api/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords: lines, location: document.getElementById('locationSel').value || 'hcm', source: currentSource, num: document.getElementById('numSel').value }),
+      });
+      const data = await res.json();
+      renderBatch(data.results);
+      loadHistory();
+    } catch (e) {
+      setContent(`<div class="error-box">❌ ${escH(e.message)}</div>`);
+    }
+  }
+
+  async function loadHistory() {
+    const res = await fetch('/api/history?limit=80');
+    const rows = await res.json();
+    const el = document.getElementById('historyList');
+    if (!rows.length) { el.innerHTML = '<div class="sidebar-empty">Chưa có lịch sử</div>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div class="history-item ${r.id === activeHistoryId ? 'active' : ''}" onclick="loadHistoryItem(${r.id}, this)">
+        <div style="display:flex;align-items:flex-start;gap:6px">
+          <div class="hi-keyword" style="flex:1;min-width:0">${escH(r.keyword)}</div>
+          <button class="delete-btn" onclick="event.stopPropagation();deleteHistory(${r.id})" title="Xoá">✕</button>
+        </div>
+        <div class="hi-meta">
+          <span class="hi-source src-${r.source}">${r.source}</span>
+          <span>${locLabel(r.location)}</span>
+          <span>${r.total_results} kq</span>
+          <span>${timeAgo(r.created_at)}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  async function loadHistoryItem(id, el) {
+    activeHistoryId = id;
+    document.querySelectorAll('.history-item').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+
+    const res = await fetch(`/api/history/${id}`);
+    const row = await res.json();
+
+    // Reconstruct display from saved data
+    const organicResults = row.results_json || [];
+    const crawlResults = row.crawl_json || [];
+
+    setContent(`
+      <div class="results-toolbar">
+        <div class="results-title">📋 Lịch sử: "${escH(row.keyword)}"</div>
+        <div class="results-meta">${new Date(row.created_at).toLocaleString('vi-VN')} · ${locLabel(row.location)} · <span class="hi-source src-${row.source}" style="border-radius:4px;padding:1px 6px;font-size:11px">${row.source}</span></div>
+      </div>
+      <div class="result-list">
+        ${organicResults.map(r => renderCard(r)).join('')}
+      </div>
+      ${crawlResults.length && row.source === 'both' ? `
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Crawl raw</div>
+          <div class="result-list">${crawlResults.map(r => renderCard({...r, source:'crawl'})).join('')}</div>
+        </div>` : ''}
+    `);
+  }
+
+  async function deleteHistory(id) {
+    await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    if (activeHistoryId === id) { activeHistoryId = null; }
+    loadHistory();
+  }
+
+  async function clearAllHistory() {
+    if (!confirm('Xoá toàn bộ lịch sử?')) return;
+    await fetch('/api/history', { method: 'DELETE' });
+    activeHistoryId = null;
+    loadHistory();
+  }
+
+  function renderResults(data) {
+    const allOrg = data.organic_results || [];
+    const ads = data.ads || [];
+    const crawlOnly = data.crawl_only || [];
+    const crawlAds = data.crawl_ads || [];
+    const ts = new Date(data.timestamp).toLocaleString('vi-VN');
+    const locName = locLabel(data.location);
+
+    let diffCount = allOrg.filter(r => r.position_diff !== null && Math.abs(r.position_diff) >= 2).length;
+
+    let html = `
+      <div class="refresh-row">
+        <span class="results-meta">Cập nhật: ${ts} · ${locName} ${data.cached ? '<span class="cached-tag">cached</span>' : ''}</span>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="doSearch('${escH(data.query)}','${data.location}',false)">↻ Refresh</button>
+        <label class="auto-toggle">
+          <span>Auto 2 phút</span>
+          <label class="sw"><input type="checkbox" id="autoChk" onchange="toggleAuto(this.checked)"><span class="sw-slider"></span></label>
+        </label>
+      </div>`;
+
+    if (data.errors) {
+      Object.entries(data.errors).forEach(([k,v]) => {
+        html += `<div class="error-box">⚠️ ${k}: ${escH(v)}</div>`;
+      });
+    }
+
+    // Stats — hiển thị đúng theo source
+    const isCrawlOnly  = data.source === 'crawl';
+    const isSerpOnly   = data.source === 'serpapi';
+    const isBoth       = data.source === 'both';
+    const serpCount    = isCrawlOnly  ? 0 : (ads.length + allOrg.length);
+    const crawlCount   = isSerpOnly   ? 0
+                       : isCrawlOnly  ? (ads.length + allOrg.length)
+                       : (data.crawl_raw?.organic_results?.length || 0) + crawlAds.length;
+    const adCount      = isCrawlOnly  ? ads.length
+                       : isSerpOnly   ? ads.length
+                       : (ads.length + crawlAds.length);
+
+    html += `<div class="stats-row">
+      ${!isCrawlOnly ? `<div class="stat-card blue"><div class="stat-val">${serpCount}</div><div class="stat-label">🔌 SerpAPI</div></div>` : ''}
+      ${!isSerpOnly  ? `<div class="stat-card green"><div class="stat-val">${crawlCount}</div><div class="stat-label">🕷️ Crawl</div></div>` : ''}
+      <div class="stat-card yellow"><div class="stat-val">${adCount}</div><div class="stat-label">📢 Quảng cáo</div></div>
+      ${isBoth ? `<div class="stat-card ${diffCount > 0 ? 'purple' : 'green'}"><div class="stat-val">${diffCount}</div><div class="stat-label">↕️ Lệch vị trí ≥2</div></div>` : ''}
+      ${crawlOnly.length ? `<div class="stat-card" style="border-color:var(--orange)"><div class="stat-val" style="color:var(--orange)">${crawlOnly.length}</div><div class="stat-label">🟠 Chỉ Crawl</div></div>` : ''}
+    </div>`;
+
+    if (data.knowledge_graph) {
+      const kg = data.knowledge_graph;
+      html += `<div class="kg-card"><div class="kg-label">Knowledge Graph</div>
+        <div class="kg-title">${escH(kg.title||'')}</div>
+        ${kg.type?`<div class="kg-type">${escH(kg.type)}</div>`:''}
+        ${kg.description?`<div class="kg-desc">${escH(kg.description)}</div>`:''}
+      </div>`;
+    }
+
+    // Tabs — _cat phân biệt nguồn đúng
+    const adCat  = isCrawlOnly ? 'ad_crawl' : 'ad_serp';
+    const orgCat = isCrawlOnly ? 'org_crawl' : 'org';
+    const allCombined = [
+      ...ads.map(a=>({...a,_cat:adCat})),
+      ...allOrg.map(r=>({...r,_cat:orgCat})),
+    ];
+    const totalTabs = allCombined.length;
+    const crawlRaw = data.crawl_raw ? [...(data.crawl_raw.ads||[]).map(a=>({...a,_cat:'ad_crawl'})), ...(data.crawl_raw.organic_results||[]).map(r=>({...r,_cat:'org_crawl'}))] : [];
+
+    const adTabLabel = isCrawlOnly ? `Ads Crawl (${ads.length})` : `Ads SerpAPI (${ads.length})`;
+    html += `<div class="tabs">
+      <button class="tab active" onclick="switchTab('all',this)">Tất cả (${totalTabs})</button>
+      ${ads.length?`<button class="tab" onclick="switchTab('ads',this)">${adTabLabel}</button>`:''}
+      <button class="tab" onclick="switchTab('organic',this)">Organic (${allOrg.length})</button>
+      ${data.source==='both'?`<button class="tab" onclick="switchTab('compare',this)">So sánh 2 nguồn</button>`:''}
+      ${crawlOnly.length?`<button class="tab" onclick="switchTab('crawlonly',this)" style="color:var(--orange)">Chỉ Crawl (${crawlOnly.length})</button>`:''}
+      ${crawlAds.length?`<button class="tab" onclick="switchTab('crawlads',this)">Ads Crawl (${crawlAds.length})</button>`:''}
+    </div>`;
+
+    html += `<div id="resultList">`;
+    html += renderCardList(allCombined);
+    html += `</div>`;
+
+    if (data.related_searches?.length) {
+      html += `<div class="related"><div class="related-label">Tìm kiếm liên quan</div><div class="related-tags">
+        ${data.related_searches.map(q=>`<span class="related-tag" onclick="doSearch('${escH(q)}')">${escH(q)}</span>`).join('')}
+      </div></div>`;
+    }
+
+    setContent(html);
+
+    // Store for tab switching
+    window._tabs = {
+      all: allCombined,
+      ads: ads.map(a=>({...a,_cat:'ad_serp'})),
+      organic: allOrg,
+      crawlonly: crawlOnly,
+      crawlads: crawlAds.map(a=>({...a,_cat:'ad_crawl'})),
+      compare: { serpOrg: allOrg, crawlOrg: data.crawl_raw?.organic_results||[] },
+    };
+  }
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    const t = window._tabs;
+    if (!t) return;
+    if (name === 'compare') {
+      document.getElementById('resultList').innerHTML = renderCompareTable(t.compare.serpOrg, t.compare.crawlOrg);
+    } else {
+      document.getElementById('resultList').innerHTML = renderCardList(t[name]||[]);
+    }
+  }
+
+  function renderCardList(items) {
+    if (!items.length) return '<div class="empty"><div class="icon">📭</div><div>Không có kết quả</div></div>';
+    return `<div class="result-list">${items.map(r=>renderCard(r)).join('')}</div>`;
+  }
+
+  function renderCard(r) {
+    const isAd = r.type === 'ad';
+    const isCrawlOnly = r._cat === 'org_crawl' || (!r.in_serpapi && !isAd && r.source === 'crawl');
+    const cls = isAd ? 'ad' : isCrawlOnly ? 'crawl-only' : 'organic';
+    const posLabel = isAd ? (r._cat === 'ad_crawl' ? 'Ad🕷️' : 'Ad') : `#${r.position}`;
+
+    let diffHtml = '';
+    if (r.position_diff !== null && r.position_diff !== undefined) {
+      if (r.position_diff < 0) diffHtml = `<span class="diff-badge diff-up">▲ ${Math.abs(r.position_diff)} so với crawl</span>`;
+      else if (r.position_diff > 0) diffHtml = `<span class="diff-badge diff-down">▼ ${r.position_diff} so với crawl</span>`;
+      else diffHtml = `<span class="diff-badge diff-same">= Cùng vị trí crawl</span>`;
+    } else if (r.in_crawl === false && !isAd) {
+      diffHtml = `<span class="diff-badge diff-missing">Không có trong crawl</span>`;
+    }
+
+    const srcIcon = r.source === 'crawl' ? '🕷️' : r.source === 'serpapi' ? '🔌' : '';
+    const typeLabel = isAd ? `📢 Quảng cáo ${srcIcon}` : isCrawlOnly ? `🕷️ Organic (Crawl)` : `🌱 Organic ${srcIcon}`;
+
+    return `<div class="rcard ${cls}" onclick="window.open('${escH(r.link||'#')}','_blank')" title="${escH(r.link||'')}">
+      <div class="rcard-header">
+        <div class="pos-badge">${posLabel}</div>
+        <div class="rcard-body">
+          <div class="rcard-type">${typeLabel}</div>
+          <div class="rcard-title">${escH(r.title||'')}</div>
+          <div class="rcard-url"><a href="${escH(r.link||'#')}" target="_blank">${escH(r.displayed_link||r.link||'')}</a></div>
+          ${r.snippet?`<div class="rcard-snippet">${escH(r.snippet)}</div>`:''}
+          ${r.date?`<div class="rcard-date">📅 ${escH(r.date)}</div>`:''}
+          ${diffHtml}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderCompareTable(serpOrg, crawlOrg) {
+    const crawlMap = new Map();
+    crawlOrg.forEach(r => { try { crawlMap.set(new URL(r.link).hostname, r); } catch {} });
+
+    const rows = serpOrg.map(r => {
+      let host = ''; try { host = new URL(r.link).hostname; } catch {}
+      const crawl = crawlMap.get(host);
+      const diff = crawl ? (r.position - crawl.position) : null;
+      const diffStr = diff === null ? '<span style="color:var(--orange)">Không có</span>'
+        : diff === 0 ? '<span style="color:var(--green)">Bằng nhau</span>'
+        : diff < 0 ? `<span style="color:var(--green)">SerpAPI cao hơn ${Math.abs(diff)}</span>`
+        : `<span style="color:var(--red)">Crawl cao hơn ${diff}</span>`;
+
+      return `<tr>
+        <td class="pos-cell pos-green">#${r.position}</td>
+        <td class="pos-cell">${crawl ? '#' + crawl.position : '—'}</td>
+        <td>${diffStr}</td>
+        <td class="title-cell">${escH(r.title||'')}</td>
+        <td class="url-cell"><a href="${escH(r.link||'#')}" target="_blank">${escH(host)}</a></td>
+      </tr>`;
+    });
+
+    // Crawl-only rows
+    const serpHosts = new Set(serpOrg.map(r => { try { return new URL(r.link).hostname; } catch { return ''; } }));
+    const crawlOnlyRows = crawlOrg.filter(r => { try { return !serpHosts.has(new URL(r.link).hostname); } catch { return false; } }).map(r => {
+      let host = ''; try { host = new URL(r.link).hostname; } catch {}
+      return `<tr>
+        <td class="pos-cell" style="color:var(--text-dim)">—</td>
+        <td class="pos-cell" style="color:var(--orange)">#${r.position}</td>
+        <td><span style="color:var(--orange)">Chỉ Crawl</span></td>
+        <td class="title-cell">${escH(r.title||'')}</td>
+        <td class="url-cell"><a href="${escH(r.link||'#')}" target="_blank">${escH(host)}</a></td>
+      </tr>`;
+    });
+
+    return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="compare-table">
+      <thead><tr>
+        <th>SerpAPI #</th><th>Crawl #</th><th>Chênh lệch</th><th>Tiêu đề</th><th>Domain</th>
+      </tr></thead>
+      <tbody>${rows.join('')}${crawlOnlyRows.join('')}</tbody>
+    </table></div>`;
+  }
+
+  function renderBatch(results) {
+    let html = `<div style="font-size:15px;font-weight:700;margin-bottom:16px">Kết quả ${results.length} từ khóa</div>`;
+    results.forEach(r => {
+      if (r.error) { html += `<div style="margin-bottom:16px"><div style="font-weight:600;margin-bottom:6px">🔍 ${escH(r.query||'')}</div><div class="error-box">❌ ${escH(r.error)}</div></div>`; return; }
+      const all = [...(r.ads||[]).map(a=>({...a,_cat:'ad'})), ...(r.organic_results||[])];
+      html += `<div style="margin-bottom:24px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+          🔍 "${escH(r.query)}" — ${all.length} kết quả
+        </div>
+        <div class="result-list">${all.map(item=>renderCard(item)).join('')}</div>
+      </div>`;
+    });
+    setContent(html);
+  }
+
+  function toggleAuto(on) {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (on && lastQ) {
+      autoTimer = setInterval(() => doSearch(lastQ, lastLoc, false), 2 * 60 * 1000);
+    }
+  }
+
+  function setContent(html) { document.getElementById('content').innerHTML = html; }
+
+  function locLabel(key) {
+    const map = { vietnam:'🇻🇳 Cả nước', hcm:'TP.HCM', hanoi:'Hà Nội', danang:'Đà Nẵng', cantho:'Cần Thơ', haiphong:'Hải Phòng' };
+    return map[key] || key;
+  }
+
+  function timeAgo(dtStr) {
+    const d = new Date(dtStr), now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return `${diff}s trước`;
+    if (diff < 3600) return `${Math.floor(diff/60)}p trước`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h trước`;
+    return d.toLocaleDateString('vi-VN');
+  }
+
+  function escH(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Chrome debug status
+  async function checkChromeStatus() {
+    try {
+      const res = await fetch('/api/chrome-status');
+      const { connected } = await res.json();
+      const ind = document.getElementById('chromeIndicator');
+      const btn = document.getElementById('chromeLaunchBtn');
+      if (connected) {
+        ind.textContent = '🟢 Chrome kết nối';
+        ind.style.color = 'var(--green)';
+        ind.style.borderColor = 'var(--green)';
+        btn.style.display = 'none';
+      } else {
+        ind.textContent = '🔴 Chrome chưa kết nối';
+        ind.style.color = 'var(--red)';
+        ind.style.borderColor = 'var(--red)';
+        btn.style.display = '';
+      }
+    } catch {}
+  }
+
+  async function launchChrome() {
+    const btn = document.getElementById('chromeLaunchBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang khởi động...';
+    try {
+      await fetch('/api/launch-chrome', { method: 'POST' });
+      // Chờ Chrome khởi động rồi check lại
+      setTimeout(() => checkChromeStatus(), 3000);
+      setTimeout(() => checkChromeStatus(), 6000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🚀 Khởi động Chrome';
+    }
+  }
+
+  // Init
+  loadLocations().then(() => {
+    loadHistory();
+    checkChromeStatus();
+    setInterval(checkChromeStatus, 15000); // check mỗi 15 giây
+    doSearch('New88');
+  });
+</script>
+</body>
+</html>
