@@ -283,6 +283,7 @@
         <input class="search-input" id="qInput" type="text" placeholder="Nhập từ khóa..." value="New88" />
         <div id="locDisplay" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-dim);white-space:nowrap">
           <span id="locLabel">⏳ Đang xác định...</span>
+          <span onclick="detectLocation()" style="cursor:pointer;margin-left:6px;font-size:14px" title="Cập nhật vị trí">🔄</span>
         </div>
         <input type="hidden" id="locationSel" value="hcm" />
         <select id="numSel">
@@ -295,8 +296,8 @@
         <div>
           <span style="font-size:11px;color:var(--text-dim);margin-right:6px">NGUỒN:</span>
           <div class="source-group">
-            <button class="source-opt active" data-src="crawl" onclick="setSource('crawl',this)">Crawl</button>
-            <button class="source-opt" data-src="serpapi" onclick="setSource('serpapi',this)">SerpAPI</button>
+            <button class="source-opt active" data-src="serpapi" onclick="setSource('serpapi',this)">📱 Mobile</button>
+            <button class="source-opt" data-src="crawl" onclick="setSource('crawl',this)">🖥️ Desktop</button>
             <button class="source-opt" data-src="both" onclick="setSource('both',this)">Cả hai</button>
           </div>
         </div>
@@ -316,7 +317,7 @@
       <div class="empty">
         <div class="icon">🔍</div>
         <div>Nhập từ khóa và nhấn Tìm kiếm</div>
-        <div style="margin-top:6px;font-size:12px">Hỗ trợ SerpAPI · Crawl trực tiếp · So sánh 2 nguồn</div>
+        <div style="margin-top:6px;font-size:12px">📱 Mobile · 🖥️ Desktop · So sánh 2 nguồn</div>
       </div>
     </div>
 
@@ -324,7 +325,7 @@
 </div>
 
 <script>
-  let currentSource = 'crawl';
+  let currentSource = 'serpapi';
   let batchOpen = false;
   let autoTimer = null;
   let lastQ = '', lastLoc = 'hcm';
@@ -417,7 +418,7 @@
     document.getElementById('qInput').value = q;
     document.getElementById('searchBtn').disabled = true;
 
-    if (showLoad) setContent(`<div class="loading"><div class="spinner"></div><div>Đang tìm "${escH(q)}"…</div><div style="font-size:12px;color:var(--text-dim)">${currentSource === 'both' ? 'SerpAPI + Crawl song song' : currentSource === 'crawl' ? 'Crawl trực tiếp Google VN Mobile' : 'SerpAPI'}</div></div>`);
+    if (showLoad) setContent(`<div class="loading"><div class="spinner"></div><div>Đang tìm "${escH(q)}"…</div><div style="font-size:12px;color:var(--text-dim)">${currentSource === 'both' ? '📱 Mobile + 🖥️ Desktop song song' : currentSource === 'crawl' ? '🖥️ Desktop (ScraperAPI)' : '📱 Mobile (SerpAPI)'}</div></div>`);
 
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&location=${loc}&source=${currentSource}&num=${num}`);
@@ -553,8 +554,8 @@
                        : (ads.length + crawlAds.length);
 
     html += `<div class="stats-row">
-      ${!isCrawlOnly ? `<div class="stat-card blue"><div class="stat-val">${serpCount}</div><div class="stat-label">🔌 SerpAPI</div></div>` : ''}
-      ${!isSerpOnly  ? `<div class="stat-card green"><div class="stat-val">${crawlCount}</div><div class="stat-label">🕷️ Crawl</div></div>` : ''}
+      ${!isCrawlOnly ? `<div class="stat-card blue"><div class="stat-val">${serpCount}</div><div class="stat-label">📱 Mobile</div></div>` : ''}
+      ${!isSerpOnly  ? `<div class="stat-card green"><div class="stat-val">${crawlCount}</div><div class="stat-label">🖥️ Desktop</div></div>` : ''}
       <div class="stat-card yellow"><div class="stat-val">${adCount}</div><div class="stat-label">📢 Quảng cáo</div></div>
       ${isBoth ? `<div class="stat-card ${diffCount > 0 ? 'purple' : 'green'}"><div class="stat-val">${diffCount}</div><div class="stat-label">↕️ Lệch vị trí ≥2</div></div>` : ''}
       ${crawlOnly.length ? `<div class="stat-card" style="border-color:var(--orange)"><div class="stat-val" style="color:var(--orange)">${crawlOnly.length}</div><div class="stat-label">🟠 Chỉ Crawl</div></div>` : ''}
@@ -579,7 +580,7 @@
     const totalTabs = allCombined.length;
     const crawlRaw = data.crawl_raw ? [...(data.crawl_raw.ads||[]).map(a=>({...a,_cat:'ad_crawl'})), ...(data.crawl_raw.organic_results||[]).map(r=>({...r,_cat:'org_crawl'}))] : [];
 
-    const adTabLabel = isCrawlOnly ? `Ads Crawl (${ads.length})` : `Ads SerpAPI (${ads.length})`;
+    const adTabLabel = isCrawlOnly ? `Ads Desktop (${ads.length})` : `Ads Mobile (${ads.length})`;
     html += `<div class="tabs">
       <button class="tab active" onclick="switchTab('all',this)">Tất cả (${totalTabs})</button>
       ${ads.length?`<button class="tab" onclick="switchTab('ads',this)">${adTabLabel}</button>`:''}
@@ -644,8 +645,8 @@
       diffHtml = `<span class="diff-badge diff-missing">Không có trong crawl</span>`;
     }
 
-    const srcIcon = r.source === 'crawl' ? '🕷️' : r.source === 'serpapi' ? '🔌' : '';
-    const typeLabel = isAd ? `📢 Quảng cáo ${srcIcon}` : isCrawlOnly ? `🕷️ Organic (Crawl)` : `🌱 Organic ${srcIcon}`;
+    const srcIcon = r.source === 'crawl' ? '🖥️' : r.source === 'serpapi' ? '📱' : '';
+    const typeLabel = isAd ? `📢 Quảng cáo ${srcIcon}` : isCrawlOnly ? `🖥️ Organic (Desktop)` : `🌱 Organic ${srcIcon}`;
 
     return `<div class="rcard ${cls}" onclick="window.open('${escH(r.link||'#')}','_blank')" title="${escH(r.link||'')}">
       <div class="rcard-header">
@@ -699,7 +700,7 @@
 
     return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="compare-table">
       <thead><tr>
-        <th>SerpAPI #</th><th>Crawl #</th><th>Chênh lệch</th><th>Tiêu đề</th><th>Domain</th>
+        <th>📱 Mobile</th><th>🖥️ Desktop</th><th>Chênh lệch</th><th>Tiêu đề</th><th>Domain</th>
       </tr></thead>
       <tbody>${rows.join('')}${crawlOnlyRows.join('')}</tbody>
     </table></div>`;
@@ -747,47 +748,9 @@
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Chrome debug status
-  async function checkChromeStatus() {
-    try {
-      const res = await fetch('/api/chrome-status');
-      const { connected } = await res.json();
-      const ind = document.getElementById('chromeIndicator');
-      const btn = document.getElementById('chromeLaunchBtn');
-      if (connected) {
-        ind.textContent = '🟢 Chrome kết nối';
-        ind.style.color = 'var(--green)';
-        ind.style.borderColor = 'var(--green)';
-        btn.style.display = 'none';
-      } else {
-        ind.textContent = '🔴 Chrome chưa kết nối';
-        ind.style.color = 'var(--red)';
-        ind.style.borderColor = 'var(--red)';
-        btn.style.display = '';
-      }
-    } catch {}
-  }
-
-  async function launchChrome() {
-    const btn = document.getElementById('chromeLaunchBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Đang khởi động...';
-    try {
-      await fetch('/api/launch-chrome', { method: 'POST' });
-      // Chờ Chrome khởi động rồi check lại
-      setTimeout(() => checkChromeStatus(), 3000);
-      setTimeout(() => checkChromeStatus(), 6000);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '🚀 Khởi động Chrome';
-    }
-  }
-
   // Init
   loadLocations().then(() => {
     loadHistory();
-    checkChromeStatus();
-    setInterval(checkChromeStatus, 15000); // check mỗi 15 giây
     doSearch('New88');
   });
 </script>

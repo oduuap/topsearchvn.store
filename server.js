@@ -132,17 +132,33 @@ app.get('/api/chrome-status', async (req, res) => {
   }
 });
 
+// ─── UULE ENCODER — mã hoá location như Google Search dùng nội bộ ────────────
+function encodeUule(locationName) {
+  const buf = Buffer.from(locationName, 'utf8');
+  const lenBuf = Buffer.alloc(1);
+  lenBuf[0] = buf.length;
+  return 'w+CAIQICI' + Buffer.concat([lenBuf, buf]).toString('base64');
+}
+
 // ─── CRAWL GOOGLE DIRECTLY ────────────────────────────────────────────────────
-async function crawlGoogle(keyword, locationKey = 'hcm', num = 20) {
+async function crawlGoogle(keyword, locationKey = 'hcm', num = 20, coords = null) {
   const SCRAPER_KEY = process.env.SCRAPER_API_KEY;
 
-  // ── ScraperAPI mode (VPS / không có Chrome) ──────────────────────────────
+  // ── ScraperAPI raw mobile mode (VPS) ────────────────────────────────────
   if (SCRAPER_KEY) {
     const wantNum = parseInt(num);
-    const baseParams = { api_key: SCRAPER_KEY, query: keyword, country_code: 'vn', hl: 'vi', num: 10 };
+
+    // Dùng ScraperAPI structured endpoint — ổn định, hỗ trợ mobile
+    const baseParams = {
+      api_key: SCRAPER_KEY,
+      query: keyword,
+      country_code: 'vn',
+      hl: 'vi',
+      num: 10,
+    };
 
     const mapOrg = (r, offset = 0) => ({
-      position: (r.position || 0) + offset,
+      position: offset + (r.position || 0),
       type: 'organic',
       title: r.title || '',
       link: r.link || '',
@@ -151,21 +167,22 @@ async function crawlGoogle(keyword, locationKey = 'hcm', num = 20) {
       source: 'crawl',
     });
 
-    const res1 = await axios.get('https://api.scraperapi.com/structured/google/search', { params: baseParams, timeout: 60000 });
+    // Page 1
+    const res1 = await axios.get('https://api.scraperapi.com/structured/google/search', {
+      params: baseParams, timeout: 60000,
+    });
     const d1 = res1.data;
     let organic_results = (d1.organic_results || []).map(r => mapOrg(r));
-
-    // Ads — thử tất cả field names có thể có
-    const rawAds = d1.ads || d1.top_ads || d1.paid_results || d1.sponsored_results || [];
+    const rawAds = d1.ads || d1.top_ads || d1.paid_results || [];
     const ads = rawAds.map((a, i) => ({
       position: i + 1, type: 'ad',
       title: a.title || '', link: a.link || a.url || '',
-      displayed_link: a.displayed_link || a.domain || a.link || '',
-      snippet: a.snippet || a.description || a.body || '',
+      displayed_link: a.displayed_link || a.link || '',
+      snippet: a.snippet || a.description || '',
       source: 'crawl',
     }));
 
-    // Fetch page 2 khi cần top 20
+    // Page 2 nếu cần top 20
     if (wantNum >= 20 && organic_results.length > 0) {
       try {
         const res2 = await axios.get('https://api.scraperapi.com/structured/google/search', {
@@ -177,13 +194,12 @@ async function crawlGoogle(keyword, locationKey = 'hcm', num = 20) {
           .map(r => mapOrg(r, organic_results.length));
         organic_results = [...organic_results, ...page2];
       } catch (e2) {
-        console.log('Page 2 timeout/err (ok, dùng page 1):', e2.message);
+        console.log('Page 2 skip:', e2.message);
       }
     }
 
-    // Đảm bảo position đúng thứ tự
     organic_results = organic_results.map((r, i) => ({ ...r, position: i + 1 }));
-    return { ads, organic_results, source: 'crawl', mode: 'scraperapi' };
+    return { ads, organic_results, source: 'crawl', mode: 'scraperapi-mobile' };
   }
 
   // ── Puppeteer mode (local, có Chrome) ────────────────────────────────────
@@ -362,9 +378,10 @@ async function geocodeCoords(lat, lon) {
 
 // ─── SERPAPI ─────────────────────────────────────────────────────────────────
 async function fetchSerpAPI(keyword, locationKey = 'hcm', num = 20) {
-  // Hỗ trợ cả predefined key (vd: 'danang') lẫn raw string (vd: 'Phnom Penh, Cambodia')
+  // SerpAPI chỉ chấp nhận location string chuẩn trong DB của họ
+  // → luôn dùng predefined key, fallback về 'Vietnam' nếu không tìm thấy
   const loc = LOCATIONS[locationKey];
-  const serpLocation = loc ? loc.serpapi : locationKey;
+  const serpLocation = loc ? loc.serpapi : 'Vietnam';
   const glCode = loc ? loc.gl : 'vn';
   const wantNum = parseInt(num);
 
@@ -377,7 +394,7 @@ async function fetchSerpAPI(keyword, locationKey = 'hcm', num = 20) {
     location: serpLocation,
     num: 10,
     api_key: SERPAPI_KEY,
-    no_cache: false,
+    no_cache: true,
   };
 
   const mapOrg = (r) => ({
