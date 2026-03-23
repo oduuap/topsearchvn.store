@@ -280,7 +280,7 @@
     <!-- SEARCH PANEL -->
     <div class="search-panel">
       <div class="search-row">
-        <input class="search-input" id="qInput" type="text" placeholder="Nhập từ khóa..." value="New88" />
+        <input class="search-input" id="qInput" type="text" placeholder="Nhập từ khoá để search top chính xác" />
         <div id="locDisplay" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-dim);white-space:nowrap">
           <span id="locLabel">⏳ Đang xác định...</span>
           <span onclick="detectLocation()" style="cursor:pointer;margin-left:6px;font-size:14px" title="Cập nhật vị trí">🔄</span>
@@ -751,7 +751,6 @@
   // Init
   loadLocations().then(() => {
     loadHistory();
-    doSearch('New88');
   });
 </script>
 </body>
